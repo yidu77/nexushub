@@ -4,6 +4,9 @@ require('dotenv').config();
    const pool = require('./db');
    const authRoutes = require('./routes/auth');
    const memberRoutes = require('./routes/members');
+   const requestRoutes = require('./routes/requests');
+      const dashboardRoutes = require('./routes/dashboard');
+      const resourceRoutes = require('./routes/resources');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -16,6 +19,12 @@ app.use(express.json());
 
    app.use('/api/members', memberRoutes);
    console.log('✅ Member routes loaded at /api/members');
+   app.use('/api/requests', requestRoutes);
+   console.log('✅ Request routes loaded at /api/requests');
+      app.use('/api/dashboard', dashboardRoutes);
+   console.log('✅ Dashboard routes loaded at /api/dashboard');
+      app.use('/api/resources', resourceRoutes);
+   console.log('✅ Resource routes loaded at /api/resources');
 
 // A simple test route
 app.get('/', (req, res) => {

@@ -1,8 +1,12 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react'; // ← useEffect comes from 'react', NOT 'react-router-dom'!
+import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
-import Layout from './components/Layout'; // Import the new Layout
+import Requests from './pages/Requests';
+import Resources from './pages/Resources';
+import Layout from './components/Layout';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -13,8 +17,19 @@ const ProtectedRoute = ({ children }) => {
 };
 
 function App() {
+  // Load theme from local storage on startup
+  useEffect(() => {
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
   return (
     <Router>
+      <Toaster position="top-right" reverseOrder={false} />
+      
       <Routes>
         {/* Login Page (Public) */}
         <Route path="/" element={<Login />} />
@@ -23,6 +38,8 @@ function App() {
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/members" element={<Members />} />
+          <Route path="/requests" element={<Requests />} />
+          <Route path="/resources" element={<Resources />} />
         </Route>
       </Routes>
     </Router>
