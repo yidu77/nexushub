@@ -1,144 +1,150 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { 
+  PieChart, Pie, Cell, 
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
+
+// Colors for the charts
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 function Dashboard() {
-  const [stats, setStats] = useState({
-    totalMembers: 0,
-    totalRequests: 0,
-    pendingRequests: 0,
-    completedRequests: 0
-  });
-  const [recentRequests, setRecentRequests] = useState([]);
+  const [stats, setStats] = useState({ members: [], requests: [], resources: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        
+        // Fetch all data at once
+        const [membersRes, requestsRes, resourcesRes] = await Promise.all([
+          axios.get('http://localhost:5000/api/members', config),
+          axios.get('http://localhost:5000/api/requests', config),
+          axios.get('http://localhost:5000/api/resources', config)
+        ]);
+
+        setStats({
+          members: membersRes.data,
+          requests: requestsRes.data,
+          resources: resourcesRes.data
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    try {
-      // 1. Fetch the summary stats
-      const statsResponse = await axios.get('http://localhost:5000/api/dashboard/stats');
-      setStats(statsResponse.data);
+  // --- Process Data for Charts ---
+  
+  // Chart 1: Requests by Status
+  const requestsByStatus = stats.requests.reduce((acc, curr) => {
+    const status = curr.status || 'Unknown';
+    const existing = acc.find(item => item.name === status);
+    if (existing) existing.value++;
+    else acc.push({ name: status, value: 1 });
+    return acc;
+  }, []);
 
-      // 2. Fetch the most recent requests for the "Recent Activity" list
-      const requestsResponse = await axios.get('http://localhost:5000/api/requests');
-      // We only want the first 3 items (since backend sorts by newest first)
-      setRecentRequests(requestsResponse.data.slice(0, 3)); 
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Chart 2: Members by Department
+  const membersByDept = stats.members.reduce((acc, curr) => {
+    const dept = curr.department || 'Unassigned';
+    const existing = acc.find(item => item.name === dept);
+    if (existing) existing.value++;
+    else acc.push({ name: dept, value: 1 });
+    return acc;
+  }, []);
 
-  // Calculate percentage for the progress bar
-  const totalStatus = stats.pendingRequests + stats.completedRequests;
-  const completionPercentage = totalStatus === 0 ? 0 : Math.round((stats.completedRequests / totalStatus) * 100);
+  // Chart 3: Resources by Category
+  const resourcesByCategory = stats.resources.reduce((acc, curr) => {
+    const cat = curr.category || 'Uncategorized';
+    const existing = acc.find(item => item.name === cat);
+    if (existing) existing.value++;
+    else acc.push({ name: cat, value: 1 });
+    return acc;
+  }, []);
 
-  if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading dashboard...</div>;
-  }
+  if (loading) return <div className="p-6 text-center text-gray-500">Loading Dashboard...</div>;
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Dashboard Overview</h1>
+    <div className="max-w-7xl mx-auto p-4 md:p-6">
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">Dashboard Overview</h1>
       
-      {/* 1. Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Total Members</p>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats.totalMembers}</p>
-            </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-            </div>
-          </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border-l-4 border-blue-500">
+          <h3 className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Members</h3>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats.members.length}</p>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-purple-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Total Requests</p>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats.totalRequests}</p>
-            </div>
-            <div className="bg-purple-100 p-3 rounded-full">
-              <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M12 16h.01"></path></svg>
-            </div>
-          </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border-l-4 border-purple-500">
+          <h3 className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Requests</h3>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats.requests.length}</p>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-yellow-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Pending Requests</p>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats.pendingRequests}</p>
-            </div>
-            <div className="bg-yellow-100 p-3 rounded-full">
-              <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium">Completed</p>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats.completedRequests}</p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-full">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-          </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border-l-4 border-green-500">
+          <h3 className="text-gray-500 dark:text-gray-400 text-sm font-medium">Total Resources</h3>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats.resources.length}</p>
         </div>
       </div>
 
-      {/* 2. Dashboard Visuals: Progress Bar & Recent Activity */}
+      {/* Charts Section */}
+      <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Analytics</h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Progress Bar Card */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">Request Completion Rate</h2>
-          <div className="mb-2 flex justify-between text-sm font-medium text-gray-600">
-            <span>Progress</span>
-            <span>{completionPercentage}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
-            <div 
-              className="bg-green-500 h-4 rounded-full transition-all duration-500" 
-              style={{ width: `${completionPercentage}%` }}
-            ></div>
-          </div>
-          <div className="flex justify-between text-xs text-gray-500">
-            <span className="flex items-center"><span className="w-3 h-3 bg-yellow-400 rounded-full mr-2"></span> Pending: {stats.pendingRequests}</span>
-            <span className="flex items-center"><span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span> Completed: {stats.completedRequests}</span>
-          </div>
+        {/* Chart 1: Requests by Status (Pie Chart) */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Requests by Status</h3>
+          {requestsByStatus.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie data={requestsByStatus} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
+                  {requestsByStatus.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-center text-gray-500 py-10">No request data yet.</p>
+          )}
         </div>
 
-        {/* Recent Activity Card */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">Recent Activity</h2>
-          {recentRequests.length === 0 ? (
-            <p className="text-gray-500 text-sm">No recent requests.</p>
+        {/* Chart 2: Members by Department (Bar Chart) */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Members by Department</h3>
+          {membersByDept.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={membersByDept}>
+                <XAxis dataKey="name" stroke="#8884d8" style={{ fontSize: '12px' }} />
+                <YAxis stroke="#8884d8" style={{ fontSize: '12px' }} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           ) : (
-            <ul className="space-y-4">
-              {recentRequests.map((req) => (
-                <li key={req.id} className="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{req.title}</p>
-                    <p className="text-xs text-gray-500">Req #{req.request_number} • {req.requested_by}</p>
-                  </div>
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                    req.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                    req.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {req.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <p className="text-center text-gray-500 py-10">No department data yet.</p>
+          )}
+        </div>
+
+        {/* Chart 3: Resources by Category (Horizontal Bar Chart) */}
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow lg:col-span-2">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Resources by Category</h3>
+          {resourcesByCategory.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={resourcesByCategory} layout="vertical">
+                <XAxis type="number" stroke="#8884d8" style={{ fontSize: '12px' }} />
+                <YAxis dataKey="name" type="category" stroke="#8884d8" style={{ fontSize: '12px' }} width={100} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-center text-gray-500 py-10">No resource data yet.</p>
           )}
         </div>
 

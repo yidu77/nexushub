@@ -1,8 +1,11 @@
 const express = require('express');
 const pool = require('../db');
+const { verifyToken, isAdmin } = require('../middleware/auth');
 const router = express.Router();
 
-// GET all resources
+router.use(verifyToken);
+
+// GET all resources (with Search AND Filters)
 router.get('/', async (req, res) => {
   try {
     const { search, category, status } = req.query;
@@ -31,11 +34,13 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST (Create) a new resource
-router.post('/', async (req, res) => {
+// POST (Create) - ADMIN ONLY
+router.post('/', isAdmin, async (req, res) => {
   try {
     const { resource_code, name, category, status } = req.body;
-    
+    const existingResource = await pool.query('SELECT * FROM resources WHERE resource_code = $1', [resource_code]);
+    if (existingResource.rows.length > 0) return res.status(400).json({ error: 'Resource code already exists' });
+
     const newResource = await pool.query(
       'INSERT INTO resources (resource_code, name, category, status) VALUES ($1, $2, $3, $4) RETURNING *',
       [resource_code, name, category, status || 'Available']
@@ -43,27 +48,20 @@ router.post('/', async (req, res) => {
     res.status(201).json(newResource.rows[0]);
   } catch (error) {
     console.error(error);
-    if (error.code === '23505') {
-      return res.status(400).json({ error: 'This Resource Code is already in use!' });
-    }
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// PUT (Update) a resource
-router.put('/:id', async (req, res) => {
+// PUT (Update) - ADMIN ONLY
+router.put('/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { resource_code, name, category, status } = req.body;
-    
     const updatedResource = await pool.query(
       'UPDATE resources SET resource_code=$1, name=$2, category=$3, status=$4 WHERE id=$5 RETURNING *',
       [resource_code, name, category, status, id]
     );
-    
-    if (updatedResource.rows.length === 0) {
-      return res.status(404).json({ error: 'Resource not found' });
-    }
+    if (updatedResource.rows.length === 0) return res.status(404).json({ error: 'Resource not found' });
     res.json(updatedResource.rows[0]);
   } catch (error) {
     console.error(error);
@@ -71,15 +69,12 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE a resource
-router.delete('/:id', async (req, res) => {
+// DELETE - ADMIN ONLY
+router.delete('/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const deletedResource = await pool.query('DELETE FROM resources WHERE id=$1 RETURNING *', [id]);
-    
-    if (deletedResource.rows.length === 0) {
-      return res.status(404).json({ error: 'Resource not found' });
-    }
+    if (deletedResource.rows.length === 0) return res.status(404).json({ error: 'Resource not found' });
     res.json({ message: 'Resource deleted successfully!' });
   } catch (error) {
     console.error(error);

@@ -7,6 +7,8 @@ require('dotenv').config();
    const requestRoutes = require('./routes/requests');
       const dashboardRoutes = require('./routes/dashboard');
       const resourceRoutes = require('./routes/resources');
+         const notificationRoutes = require('./routes/notifications');
+            const searchRoutes = require('./routes/globalSearch'); 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -25,6 +27,10 @@ app.use(express.json());
    console.log('✅ Dashboard routes loaded at /api/dashboard');
       app.use('/api/resources', resourceRoutes);
    console.log('✅ Resource routes loaded at /api/resources');
+      app.use('/api/notifications', notificationRoutes);
+   console.log('✅ Notification routes loaded at /api/notifications');
+      app.use('/api/search', searchRoutes);
+   console.log('✅ Global Search routes loaded at /api/search');
 
 // A simple test route
 app.get('/', (req, res) => {

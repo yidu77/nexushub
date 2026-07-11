@@ -7,6 +7,9 @@ import Members from './pages/Members';
 import Requests from './pages/Requests';
 import Resources from './pages/Resources';
 import Layout from './components/Layout';
+   import SearchResults from './pages/SearchResults';
+      import Statistics from './pages/Statistics';
+         import Profile from './pages/Profile';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -40,6 +43,9 @@ function App() {
           <Route path="/members" element={<Members />} />
           <Route path="/requests" element={<Requests />} />
           <Route path="/resources" element={<Resources />} />
+             <Route path="/search" element={<SearchResults />} />
+                <Route path="/statistics" element={<Statistics />} />
+                <Route path="/profile" element={<Profile />} />
         </Route>
       </Routes>
     </Router>
