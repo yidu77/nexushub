@@ -6,7 +6,7 @@ function Topbar({ onMenuClick }) {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const [isDark, setIsDark] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''); // NEW
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains('dark'));
@@ -24,17 +24,10 @@ function Topbar({ onMenuClick }) {
     }
   };
 
-  // NEW: Handle Search
   const handleSearch = (e) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/');
   };
 
   return (
@@ -55,7 +48,7 @@ function Topbar({ onMenuClick }) {
         </h2>
       </div>
 
-      {/* NEW: Global Search Bar */}
+      {/* Global Search Bar */}
       <div className="flex-1 w-full md:max-w-md mx-4">
         <div className="relative">
           <input
@@ -88,8 +81,6 @@ function Topbar({ onMenuClick }) {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
           )}
         </button>
-
-        <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm md:text-base">Logout</button>
       </div>
     </header>
   );

@@ -63,7 +63,7 @@ function NotificationBell() {
 
       {/* The Dropdown Menu */}
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 border dark:border-gray-700 overflow-hidden">
+           <div className="fixed sm:absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 border dark:border-gray-700 overflow-hidden top-16 sm:top-auto">
           <div className="p-3 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900">
             <h3 className="font-semibold text-gray-800 dark:text-white">Notifications</h3>
             {unreadCount > 0 && (

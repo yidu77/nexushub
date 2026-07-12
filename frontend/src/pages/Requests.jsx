@@ -1,31 +1,36 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 
 function Requests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState(''); // NEW
-  const [filterPriority, setFilterPriority] = useState(''); // NEW
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     request_number: '', title: '', description: '', 
     status: 'Pending', priority: 'Medium', requested_by: '', assigned_to: ''
   });
+  
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = user.role === 'admin';
+  const canManage = user.role === 'admin' || user.role === 'manager'; 
+  const canCreate = user.role !== 'viewer'; 
+
   const token = localStorage.getItem('token');
   const config = { headers: { Authorization: `Bearer ${token}` } };
 
-  useEffect(() => { fetchRequests(); }, []);
+  useEffect(() => { 
+    fetchRequests(); 
+  }, [search, filterStatus, filterPriority]);
 
   const fetchRequests = async () => {
     try {
-      // Send search AND filters to backend
       const response = await axios.get(`http://localhost:5000/api/requests?search=${search}&status=${filterStatus}&priority=${filterPriority}`, config);
       setRequests(response.data);
     } catch (error) { console.error('Error fetching requests:', error); } 
@@ -77,11 +82,24 @@ function Requests() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this request?')) {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (result.isConfirmed) {
       try {
         await axios.delete(`http://localhost:5000/api/requests/${id}`, config);
-        fetchRequests(); toast.success('Request deleted successfully!');
-      } catch (error) { toast.error('Error deleting request'); }
+        fetchRequests();
+        Swal.fire('Deleted!', 'Request has been deleted.', 'success');
+      } catch (error) {
+        Swal.fire('Error!', 'Failed to delete request', 'error');
+      }
     }
   };
 
@@ -94,36 +112,34 @@ function Requests() {
     <div className="max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Work Requests</h1>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full sm:w-auto text-sm md:text-base">
-          {editingId ? 'Cancel Edit' : '+ New Request'}
-        </button>
+        {canCreate && (
+          <button    onClick={() => { 
+     resetForm(); 
+     setFormData(prev => ({ ...prev, requested_by: user.email }));
+     setShowForm(true); 
+   }} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full sm:w-auto text-sm md:text-base">
+            {editingId ? 'Cancel Edit' : '+ New Request'}
+          </button>
+        )}
       </div>
 
-      {/* Search and Filters */}
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <input 
-          type="text" placeholder="Search Request #, Title..." value={search} 
-          onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchRequests()} 
-          className="p-2 border rounded shadow-sm focus:ring-2 focus:ring-blue-500 text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700" 
-        />
-        {/* Status Filter */}
+        <input type="text" placeholder="Search Request #, Title..." value={search} onChange={(e) => setSearch(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700" />
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700">
           <option value="">All Statuses</option>
           <option value="Pending">Pending</option>
           <option value="In Progress">In Progress</option>
           <option value="Completed">Completed</option>
         </select>
-        {/* Priority Filter */}
         <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700">
           <option value="">All Priorities</option>
           <option value="Low">Low</option>
           <option value="Medium">Medium</option>
           <option value="High">High</option>
         </select>
-        <button onClick={fetchRequests} className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 text-sm md:text-base">Apply Filters</button>
       </div>
 
-      {showForm && (
+      {showForm && canCreate && (
         <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow mb-6">
           <h2 className="text-lg md:text-xl font-semibold mb-4 dark:text-white">{editingId ? 'Edit Request' : 'Create New Request'}</h2>
           <form onSubmit={editingId ? handleUpdate : handleAddRequest} className="grid grid-cols-1 gap-3">
@@ -160,7 +176,7 @@ function Requests() {
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Priority</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Assigned To</th>
-                  {isAdmin && <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
+                  {canManage && <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -173,7 +189,7 @@ function Requests() {
                     </td>
                     <td className="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 dark:text-gray-300 hidden sm:table-cell">{req.priority}</td>
                     <td className="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 dark:text-gray-300 hidden md:table-cell">{req.assigned_to || '-'}</td>
-                    {isAdmin && (
+                    {canManage && (
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-1 md:gap-2">
                           <button onClick={() => handleEdit(req)} className="p-1 md:p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">✏️</button>

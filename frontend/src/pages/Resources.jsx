@@ -1,30 +1,30 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import Swal from 'sweetalert2';
 
 function Resources() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterCategory, setFilterCategory] = useState(''); // NEW
-  const [filterStatus, setFilterStatus] = useState(''); // NEW
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    resource_code: '', name: '', category: '', status: 'Available'
-  });
+  const [formData, setFormData] = useState({ resource_code: '', name: '', category: '', status: 'Available' });
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const isAdmin = user.role === 'admin';
+  const canManage = user.role === 'admin' || user.role === 'manager';
   const token = localStorage.getItem('token');
   const config = { headers: { Authorization: `Bearer ${token}` } };
 
-  useEffect(() => { fetchResources(); }, []);
+  useEffect(() => { 
+    fetchResources(); 
+  }, [search, filterCategory, filterStatus]);
 
   const fetchResources = async () => {
     try {
-      // Send search AND filters to backend
       const response = await axios.get(`http://localhost:5000/api/resources?search=${search}&category=${filterCategory}&status=${filterStatus}`, config);
       setResources(response.data);
     } catch (error) { console.error('Error fetching resources:', error); } 
@@ -34,10 +34,7 @@ function Resources() {
   const handleChange = (e) => { setFormData({ ...formData, [e.target.name]: e.target.value }); };
 
   const validateForm = () => {
-    if (!formData.resource_code.trim() || !formData.name.trim()) {
-      toast.error('Please fill in all required fields (Code and Name)');
-      return false;
-    }
+    if (!formData.resource_code.trim() || !formData.name.trim()) { toast.error('Please fill in all required fields'); return false; }
     if (!editingId) {
       const codeExists = resources.some(res => res.resource_code.toLowerCase() === formData.resource_code.toLowerCase());
       if (codeExists) { toast.error('This Resource Code is already in use.'); return false; }
@@ -73,11 +70,24 @@ function Resources() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this resource?')) {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (result.isConfirmed) {
       try {
         await axios.delete(`http://localhost:5000/api/resources/${id}`, config);
-        fetchResources(); toast.success('Resource deleted successfully!');
-      } catch (error) { toast.error('Error deleting resource'); }
+        fetchResources();
+        Swal.fire('Deleted!', 'Resource has been deleted.', 'success');
+      } catch (error) {
+        Swal.fire('Error!', 'Failed to delete resource', 'error');
+      }
     }
   };
 
@@ -90,21 +100,15 @@ function Resources() {
     <div className="max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Resources</h1>
-        {isAdmin && (
+        {canManage && (
           <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full sm:w-auto text-sm md:text-base">
             {editingId ? 'Cancel Edit' : '+ Add Resource'}
           </button>
         )}
       </div>
 
-      {/* Search and Filters */}
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <input 
-          type="text" placeholder="Search Code or Name..." value={search} 
-          onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchResources()} 
-          className="p-2 border rounded shadow-sm focus:ring-2 focus:ring-blue-500 text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700" 
-        />
-        {/* Category Filter */}
+        <input type="text" placeholder="Search Code or Name..." value={search} onChange={(e) => setSearch(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700" />
         <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700">
           <option value="">All Categories</option>
           <option value="IT">IT</option>
@@ -112,17 +116,15 @@ function Resources() {
           <option value="Furniture">Furniture</option>
           <option value="Vehicles">Vehicles</option>
         </select>
-        {/* Status Filter */}
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700">
           <option value="">All Statuses</option>
           <option value="Available">Available</option>
           <option value="In Use">In Use</option>
           <option value="Maintenance">Maintenance</option>
         </select>
-        <button onClick={fetchResources} className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 text-sm md:text-base">Apply Filters</button>
       </div>
 
-      {showForm && isAdmin && (
+      {showForm && canManage && (
         <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow mb-6">
           <h2 className="text-lg md:text-xl font-semibold mb-4 dark:text-white">{editingId ? 'Edit Resource' : 'Add New Resource'}</h2>
           <form onSubmit={editingId ? handleUpdate : handleAddResource} className="grid grid-cols-1 gap-3">
@@ -134,7 +136,7 @@ function Resources() {
               <option value="In Use">In Use</option>
               <option value="Maintenance">Maintenance</option>
             </select>
-            <button type="submit" disabled={submitting} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm md:text-base">
+            <button type="submit" disabled={submitting} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm md:text-base">
               {submitting ? 'Processing...' : (editingId ? 'Update Resource' : 'Save Resource')}
             </button>
           </form>
@@ -151,7 +153,7 @@ function Resources() {
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Category</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  {isAdmin && <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
+                  {canManage && <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -163,7 +165,7 @@ function Resources() {
                     <td className="px-3 md:px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${res.status === 'Available' ? 'bg-green-100 text-green-800' : res.status === 'In Use' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{res.status}</span>
                     </td>
-                    {isAdmin && (
+                    {canManage && (
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-1 md:gap-2">
                           <button onClick={() => handleEdit(res)} className="p-1 md:p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">✏️</button>

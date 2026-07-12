@@ -11,6 +11,7 @@ const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.id;
+     req.userEmail = decoded.email; 
     req.userRole = decoded.role;
     req.userDepartment = decoded.department; // NEW: We will add this to the token later
     next();

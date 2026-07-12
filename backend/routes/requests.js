@@ -5,17 +5,25 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-// GET all requests (Staff only see their own)
-router.get('/', async (req, res) => {
+// GET all requests (with filtering)
+router.get('/', verifyToken, async (req, res) => {
   try {
     const { search, status, priority } = req.query;
-    let query = 'SELECT * FROM requests WHERE 1=1';
+    let query = `SELECT * FROM requests WHERE 1=1`;
     const values = [];
 
-    // NEW: Staff can only see requests they made or are assigned to
-    if (req.userRole === 'staff') {
-      values.push(`%${req.userEmail}%`);
-      query += ` AND (requested_by ILIKE $${values.length} OR assigned_to ILIKE $${values.length})`;
+    // If user is a manager, only show requests from their department
+    if (req.userRole === 'manager') {
+      values.push(req.userDepartment);
+      query += ` AND department = $${values.length}`;
+    }
+    
+    // If user is staff (not admin/manager), only show:
+    // 1. Requests they created (requested_by matches their email)
+    // 2. Requests assigned to them
+    if (req.userRole === 'staff' || req.userRole === 'viewer') {
+      values.push(req.userEmail);
+      query += ` AND (requested_by = $${values.length} OR assigned_to ILIKE $${values.length})`;
     }
 
     if (search) {

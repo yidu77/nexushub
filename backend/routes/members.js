@@ -75,7 +75,7 @@ router.post('/', isAdmin, async (req, res) => {
 router.put('/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, department, status, role } = req.body;
+    const { name, email, phone, department, status, role, password } = req.body; // Added password
 
     // 1. Get the user_id associated with this member
     const memberCheck = await pool.query('SELECT user_id FROM members WHERE id = $1', [id]);
@@ -87,12 +87,17 @@ router.put('/:id', isAdmin, async (req, res) => {
       [name, email, phone, department, status, id]
     );
 
-    // 3. Update user role and department using the user_id (Much safer than email!)
-    if (userId && role) {
-      await pool.query(
-        'UPDATE users SET role=$1, department=$2 WHERE id=$3',
-        [role, department, userId]
-      );
+    // 3. Update user account
+    if (userId) {
+      // Update role and department
+      await pool.query('UPDATE users SET role=$1, department=$2 WHERE id=$3', [role, department, userId]);
+      
+      // NEW: Update password if the admin typed a new one
+      if (password && password.trim() !== '') {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+        await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [passwordHash, userId]);
+      }
     }
 
     if (updatedMember.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
@@ -105,22 +110,29 @@ router.put('/:id', isAdmin, async (req, res) => {
 
 // DELETE - ADMIN ONLY
 router.delete('/:id', isAdmin, async (req, res) => {
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
     const { id } = req.params;
-    const member = await client.query('SELECT email FROM members WHERE id=$1', [id]);
-    if (member.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Member not found' }); }
     
-    await client.query('DELETE FROM users WHERE email=$1', [member.rows[0].email]);
-    await client.query('DELETE FROM members WHERE id=$1', [id]);
-    await client.query('COMMIT');
-    res.json({ message: 'Member and user account deleted successfully!' });
+    // STEP 1: Get the user_id from the member record
+    const memberResult = await pool.query('SELECT user_id FROM members WHERE id = $1', [id]);
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    const userId = memberResult.rows[0].user_id;
+    
+    // STEP 2: Delete from members table FIRST
+    await pool.query('DELETE FROM members WHERE id = $1', [id]);
+    
+    // STEP 3: THEN delete from users table
+    if (userId) {
+      await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    }
+    
+    res.json({ message: 'Member deleted successfully!' });
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error(error);
-    res.status(500).json({ error: 'Server error' });
-  } finally { client.release(); }
+    console.error('DELETE ERROR:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
+  }
 });
-
-module.exports = router;
+   module.exports = router;
