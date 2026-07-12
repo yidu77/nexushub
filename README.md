@@ -158,11 +158,15 @@ npm install
 ```
 
 4. **Set up the database**
-```bash
-# Create PostgreSQL database
-createdb nexushub
 
-# The tables will be created automatically on first run
+Create a PostgreSQL database (locally, or a free cloud instance like [Neon](https://neon.tech)) and point `DATABASE_URL` in `backend/.env` at it (see [Environment Variables](#-environment-variables) below). Then, from the `backend` folder, run:
+
+```bash
+# Creates all required tables (users, members, requests, resources)
+node setup.js
+
+# Seeds a test admin account for logging in
+node seed.js
 ```
 
 5. **Configure environment variables**
@@ -181,6 +185,11 @@ npm run dev
 
 7. **Open your browser**
 Navigate to `http://localhost:5173`
+
+8. **Log in**
+Use the seeded admin account:
+- **Email:** `admin@nexushub.com`
+- **Password:** `password123`
 
 ---
 
