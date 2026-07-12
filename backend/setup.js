@@ -57,10 +57,22 @@ const createTables = async () => {
     `);
     console.log('✅ Resources table created');
 
+    // 5. Notifications Table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Notifications table created');
+
     console.log('\n All tables created successfully in your cloud database!');
-    
+
     // Close the connection so the script can finish
-    process.exit(0); 
+    process.exit(0);
   } catch (error) {
     console.error('❌ Error creating tables:', error);
     process.exit(1);
