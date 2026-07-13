@@ -210,7 +210,7 @@ PORT=5000
 ### Frontend (`frontend/.env`)
 ```env
 # Backend API URL
-VITE_API_URL=http://localhost:5000/api
+VITE_API_URL=https://nexushub-backend-985p.onrender.com/api
 ```
 
 > In production, `VITE_API_URL` is set in the Vercel project's Environment Variables to point at the live Render backend instead of localhost.

@@ -19,9 +19,9 @@ function Dashboard() {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         
         const [membersRes, requestsRes, resourcesRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/members', config),
-          axios.get('http://localhost:5000/api/requests', config),
-          axios.get('http://localhost:5000/api/resources', config)
+          axios.get('https://nexushub-backend-985p.onrender.com/api/members', config),
+          axios.get('https://nexushub-backend-985p.onrender.com/api/requests', config),
+          axios.get('https://nexushub-backend-985p.onrender.com/api/resources', config)
         ]);
 
         setData({

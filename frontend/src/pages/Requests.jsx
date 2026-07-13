@@ -31,7 +31,7 @@ function Requests() {
 
   const fetchRequests = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/requests?search=${search}&status=${filterStatus}&priority=${filterPriority}`, config);
+      const response = await axios.get(`https://nexushub-backend-985p.onrender.com/api/requests?search=${search}&status=${filterStatus}&priority=${filterPriority}`, config);
       setRequests(response.data);
     } catch (error) { console.error('Error fetching requests:', error); } 
     finally { setLoading(false); }
@@ -56,7 +56,7 @@ function Requests() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:5000/api/requests', formData, config);
+      await axios.post('https://nexushub-backend-985p.onrender.com/api/requests', formData, config);
       resetForm(); fetchRequests(); toast.success('Request created successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Error creating request'); }
     finally { setSubmitting(false); }
@@ -75,7 +75,7 @@ function Requests() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.put(`http://localhost:5000/api/requests/${editingId}`, formData, config);
+      await axios.put(`https://nexushub-backend-985p.onrender.com/api/requests/${editingId}`, formData, config);
       resetForm(); fetchRequests(); toast.success('Request updated successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Error updating request'); }
     finally { setSubmitting(false); }
@@ -94,7 +94,7 @@ function Requests() {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`http://localhost:5000/api/requests/${id}`, config);
+        await axios.delete(`https://nexushub-backend-985p.onrender.com/api/requests/${id}`, config);
         fetchRequests();
         Swal.fire('Deleted!', 'Request has been deleted.', 'success');
       } catch (error) {

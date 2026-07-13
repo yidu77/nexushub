@@ -12,11 +12,11 @@ function NotificationBell() {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
       // Fetch notifications
-      const notifRes = await axios.get('http://localhost:5000/api/notifications', config);
+      const notifRes = await axios.get('https://nexushub-backend-985p.onrender.com/api/notifications', config);
       setNotifications(notifRes.data);
       
       // Fetch unread count
-      const countRes = await axios.get('http://localhost:5000/api/notifications/unread-count', config);
+      const countRes = await axios.get('https://nexushub-backend-985p.onrender.com/api/notifications/unread-count', config);
       setUnreadCount(countRes.data.count);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -34,7 +34,7 @@ function NotificationBell() {
     try {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.put('http://localhost:5000/api/notifications/read-all', {}, config);
+      await axios.put('https://nexushub-backend-985p.onrender.com/api/notifications/read-all', {}, config);
       setUnreadCount(0);
       fetchNotifications(); // Refresh the list
     } catch (error) {

@@ -25,7 +25,7 @@ function Resources() {
 
   const fetchResources = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/resources?search=${search}&category=${filterCategory}&status=${filterStatus}`, config);
+      const response = await axios.get(`https://nexushub-backend-985p.onrender.com/api/resources?search=${search}&category=${filterCategory}&status=${filterStatus}`, config);
       setResources(response.data);
     } catch (error) { console.error('Error fetching resources:', error); } 
     finally { setLoading(false); }
@@ -47,7 +47,7 @@ function Resources() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:5000/api/resources', formData, config);
+      await axios.post('https://nexushub-backend-985p.onrender.com/api/resources', formData, config);
       resetForm(); fetchResources(); toast.success('Resource added successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Error adding resource'); }
     finally { setSubmitting(false); }
@@ -63,7 +63,7 @@ function Resources() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.put(`http://localhost:5000/api/resources/${editingId}`, formData, config);
+      await axios.put(`https://nexushub-backend-985p.onrender.com/api/resources/${editingId}`, formData, config);
       resetForm(); fetchResources(); toast.success('Resource updated successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Error updating resource'); }
     finally { setSubmitting(false); }
@@ -82,7 +82,7 @@ function Resources() {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`http://localhost:5000/api/resources/${id}`, config);
+        await axios.delete(`https://nexushub-backend-985p.onrender.com/api/resources/${id}`, config);
         fetchResources();
         Swal.fire('Deleted!', 'Resource has been deleted.', 'success');
       } catch (error) {

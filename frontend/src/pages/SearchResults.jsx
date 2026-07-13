@@ -16,7 +16,7 @@ function SearchResults() {
         try {
           const token = localStorage.getItem('token');
           const config = { headers: { Authorization: `Bearer ${token}` } };
-          const response = await axios.get(`http://localhost:5000/api/search?q=${query}`, config);
+          const response = await axios.get(`https://nexushub-backend-985p.onrender.com/api/search?q=${query}`, config);
           setResults(response.data);
         } catch (error) {
           console.error('Error fetching search results:', error);

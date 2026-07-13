@@ -27,7 +27,7 @@ function Members() {
 
   const fetchMembers = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/members?search=${search}&department=${filterDept}&status=${filterStatus}`, config);
+      const response = await axios.get(`https://nexushub-backend-985p.onrender.com/api/members?search=${search}&department=${filterDept}&status=${filterStatus}`, config);
       setMembers(response.data);
     } catch (error) { console.error('Error fetching members:', error); } 
     finally { setLoading(false); }
@@ -48,7 +48,7 @@ function Members() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:5000/api/members', formData, config);
+      await axios.post('https://nexushub-backend-985p.onrender.com/api/members', formData, config);
       resetForm(); fetchMembers(); toast.success('Member added successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Failed to add member'); }
     finally { setSubmitting(false); }
@@ -64,7 +64,7 @@ function Members() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.put(`http://localhost:5000/api/members/${editingId}`, formData, config);
+      await axios.put(`https://nexushub-backend-985p.onrender.com/api/members/${editingId}`, formData, config);
       resetForm(); fetchMembers(); toast.success('Member updated successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Failed to update member'); }
     finally { setSubmitting(false); }
@@ -83,7 +83,7 @@ function Members() {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`http://localhost:5000/api/members/${id}`, config);
+        await axios.delete(`https://nexushub-backend-985p.onrender.com/api/members/${id}`, config);
         fetchMembers();
         Swal.fire('Deleted!', 'Member has been deleted.', 'success');
       } catch (error) {

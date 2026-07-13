@@ -32,7 +32,7 @@ function Profile() {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
-      await axios.put('http://localhost:5000/api/auth/profile/password', {
+      await axios.put('https://nexushub-backend-985p.onrender.com/api/auth/profile/password', {
         currentPassword,
         newPassword
       }, config);
@@ -56,7 +56,7 @@ function Profile() {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
-      await axios.put('http://localhost:5000/api/auth/profile', {
+      await axios.put('https://nexushub-backend-985p.onrender.com/api/auth/profile', {
         name,
         phone,
         displayName
