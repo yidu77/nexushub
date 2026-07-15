@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 
 function Requests() {
   const [requests, setRequests] = useState([]);
+  const [assignableUsers, setAssignableUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
@@ -12,36 +13,47 @@ function Requests() {
   const [filterPriority, setFilterPriority] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  // requested_by removed — the backend sets this automatically from your logged-in account
   const [formData, setFormData] = useState({
-    request_number: '', title: '', description: '', 
-    status: 'Pending', priority: 'Medium', requested_by: '', assigned_to: ''
+    request_number: '', title: '', description: '',
+    status: 'Pending', priority: 'Medium', assigned_to: ''
   });
-  
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const canManage = user.role === 'admin' || user.role === 'manager'; 
-  const canCreate = user.role !== 'viewer'; 
+  const canManage = user.role === 'admin' || user.role === 'manager';
+  const canCreate = user.role !== 'viewer';
 
   const token = localStorage.getItem('token');
   const config = { headers: { Authorization: `Bearer ${token}` } };
 
-  useEffect(() => { 
-    fetchRequests(); 
+  useEffect(() => {
+    fetchRequests();
+    // Only admins/managers can assign requests, so only fetch the user list for them
+    if (canManage) {
+      fetchAssignableUsers();
+    }
   }, [search, filterStatus, filterPriority]);
 
   const fetchRequests = async () => {
     try {
       const response = await axios.get(`https://nexushub-backend-985p.onrender.com/api/requests?search=${search}&status=${filterStatus}&priority=${filterPriority}`, config);
       setRequests(response.data);
-    } catch (error) { console.error('Error fetching requests:', error); } 
+    } catch (error) { console.error('Error fetching requests:', error); }
     finally { setLoading(false); }
+  };
+
+  const fetchAssignableUsers = async () => {
+    try {
+      const response = await axios.get('https://nexushub-backend-985p.onrender.com/api/auth/users', config);
+      setAssignableUsers(response.data);
+    } catch (error) { console.error('Error fetching assignable users:', error); }
   };
 
   const handleChange = (e) => { setFormData({ ...formData, [e.target.name]: e.target.value }); };
 
   const validateForm = () => {
-    if (!formData.request_number.trim() || !formData.title.trim() || !formData.requested_by.trim()) {
-      toast.error('Please fill in all required fields (Request #, Title, Requested By)');
+    if (!formData.request_number.trim() || !formData.title.trim()) {
+      toast.error('Please fill in all required fields (Request #, Title)');
       return false;
     }
     if (!editingId) {
@@ -56,7 +68,9 @@ function Requests() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.post('https://nexushub-backend-985p.onrender.com/api/requests', formData, config);
+      // assigned_to sent as a user id (or empty). requested_by is handled server-side.
+      const payload = { ...formData, assigned_to: formData.assigned_to || null };
+      await axios.post('https://nexushub-backend-985p.onrender.com/api/requests', payload, config);
       resetForm(); fetchRequests(); toast.success('Request created successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Error creating request'); }
     finally { setSubmitting(false); }
@@ -65,7 +79,7 @@ function Requests() {
   const handleEdit = (req) => {
     setFormData({
       request_number: req.request_number, title: req.title, description: req.description || '',
-      status: req.status, priority: req.priority, requested_by: req.requested_by, assigned_to: req.assigned_to || ''
+      status: req.status, priority: req.priority, assigned_to: req.assigned_to || ''
     });
     setEditingId(req.id); setShowForm(true);
   };
@@ -75,7 +89,8 @@ function Requests() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.put(`https://nexushub-backend-985p.onrender.com/api/requests/${editingId}`, formData, config);
+      const payload = { ...formData, assigned_to: formData.assigned_to || null };
+      await axios.put(`https://nexushub-backend-985p.onrender.com/api/requests/${editingId}`, payload, config);
       resetForm(); fetchRequests(); toast.success('Request updated successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Error updating request'); }
     finally { setSubmitting(false); }
@@ -104,7 +119,7 @@ function Requests() {
   };
 
   const resetForm = () => {
-    setFormData({ request_number: '', title: '', description: '', status: 'Pending', priority: 'Medium', requested_by: '', assigned_to: '' });
+    setFormData({ request_number: '', title: '', description: '', status: 'Pending', priority: 'Medium', assigned_to: '' });
     setEditingId(null); setShowForm(false);
   };
 
@@ -113,11 +128,7 @@ function Requests() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Work Requests</h1>
         {canCreate && (
-          <button    onClick={() => { 
-     resetForm(); 
-     setFormData(prev => ({ ...prev, requested_by: user.email }));
-     setShowForm(true); 
-   }} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full sm:w-auto text-sm md:text-base">
+          <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full sm:w-auto text-sm md:text-base">
             {editingId ? 'Cancel Edit' : '+ New Request'}
           </button>
         )}
@@ -145,8 +156,21 @@ function Requests() {
           <form onSubmit={editingId ? handleUpdate : handleAddRequest} className="grid grid-cols-1 gap-3">
             <input type="text" name="request_number" placeholder="Request Number *" required value={formData.request_number} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
             <input type="text" name="title" placeholder="Title *" required value={formData.title} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
-            <input type="text" name="requested_by" placeholder="Requested By *" required value={formData.requested_by} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
-            <input type="text" name="assigned_to" placeholder="Assigned To" value={formData.assigned_to} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
+
+            {/* Assign To — only Admins/Managers get to pick who; others just leave it unassigned */}
+            {canManage ? (
+              <select name="assigned_to" value={formData.assigned_to} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                <option value="">Unassigned</option>
+                {assignableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name || u.email}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                This request will be submitted under your account: <strong>{user.email}</strong>
+              </p>
+            )}
+
             <select name="status" value={formData.status} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600">
               <option value="Pending">Pending</option>
               <option value="In Progress">In Progress</option>
@@ -175,6 +199,7 @@ function Requests() {
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Priority</th>
+                  <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Requested By</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Assigned To</th>
                   {canManage && <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
                 </tr>
@@ -188,7 +213,8 @@ function Requests() {
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${req.status === 'Completed' ? 'bg-green-100 text-green-800' : req.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{req.status}</span>
                     </td>
                     <td className="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 dark:text-gray-300 hidden sm:table-cell">{req.priority}</td>
-                    <td className="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 dark:text-gray-300 hidden md:table-cell">{req.assigned_to || '-'}</td>
+                    <td className="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 dark:text-gray-300 hidden md:table-cell">{req.requested_by_name || req.requested_by_email || '-'}</td>
+                    <td className="px-3 md:px-6 py-4 whitespace-nowrap text-xs md:text-sm text-gray-500 dark:text-gray-300 hidden md:table-cell">{req.assigned_to_name || req.assigned_to_email || '-'}</td>
                     {canManage && (
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-1 md:gap-2">
