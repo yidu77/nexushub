@@ -13,8 +13,23 @@ const searchRoutes = require('./routes/globalSearch');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware to allow frontend to talk to backend
-app.use(cors());
+// Middleware to allow ONLY our frontend to talk to backend
+const allowedOrigins = [
+  'https://nexushub-bay.vercel.app', // production frontend
+  'http://localhost:5173',           // local dev (Vite default port)
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like Postman, curl, or server-to-server calls)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+}));
+
 // Middleware to read JSON data from the frontend
 app.use(express.json());
 
