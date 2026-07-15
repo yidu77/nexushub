@@ -29,9 +29,12 @@ function Sidebar() {
       
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        <Link to="/dashboard" className={`block p-2.5 rounded text-sm ${getLinkClass('/dashboard')}`}>
-           📊 Dashboard
-        </Link>
+        {/* Dashboard link only shown to admins */}
+        {user.role === 'admin' && (
+          <Link to="/dashboard" className={`block p-2.5 rounded text-sm ${getLinkClass('/dashboard')}`}>
+             📊 Dashboard
+          </Link>
+        )}
         <Link to="/members" className={`block p-2.5 rounded text-sm ${getLinkClass('/members')}`}>
           👥 Team Members
         </Link>
@@ -39,7 +42,7 @@ function Sidebar() {
           📝 Work Requests
         </Link>
         <Link to="/resources" className={`block p-2.5 rounded text-sm ${getLinkClass('/resources')}`}>
-           Resources
+          📦 Resources
         </Link>
         <Link to="/statistics" className={`block p-2.5 rounded text-sm ${getLinkClass('/statistics')}`}>
           📈 Statistics
