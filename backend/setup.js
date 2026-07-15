@@ -9,6 +9,10 @@ const createTables = async () => {
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(50) NOT NULL DEFAULT 'staff',
+        department VARCHAR(100),
+        name VARCHAR(255),
+        phone VARCHAR(50),
+        display_name VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -23,12 +27,14 @@ const createTables = async () => {
         phone VARCHAR(50),
         department VARCHAR(100),
         status VARCHAR(50) DEFAULT 'Active',
+        user_id INTEGER REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('✅ Members table created');
 
     // 3. Work Requests Table
+    // requested_by / assigned_to are now REAL links to users, not free-text names
     await pool.query(`
       CREATE TABLE IF NOT EXISTS requests (
         id SERIAL PRIMARY KEY,
@@ -37,8 +43,9 @@ const createTables = async () => {
         description TEXT,
         status VARCHAR(50) DEFAULT 'Pending',
         priority VARCHAR(50) DEFAULT 'Medium',
-        requested_by VARCHAR(255),
-        assigned_to VARCHAR(255),
+        requested_by INTEGER REFERENCES users(id),
+        assigned_to INTEGER REFERENCES users(id),
+        department VARCHAR(100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -71,7 +78,6 @@ const createTables = async () => {
 
     console.log('\n All tables created successfully in your cloud database!');
 
-    // Close the connection so the script can finish
     process.exit(0);
   } catch (error) {
     console.error('❌ Error creating tables:', error);
