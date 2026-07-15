@@ -1,9 +1,10 @@
 const express = require('express');
 const pool = require('../db');
+const { verifyToken, isAdmin } = require('../middleware/auth');
 const router = express.Router();
 
-// GET dashboard statistics
-router.get('/stats', async (req, res) => {
+// GET dashboard statistics — Admins only
+router.get('/stats', verifyToken, isAdmin, async (req, res) => {
   try {
     // Get total members
     const membersResult = await pool.query('SELECT COUNT(*) FROM members');

@@ -7,15 +7,30 @@ import Members from './pages/Members';
 import Requests from './pages/Requests';
 import Resources from './pages/Resources';
 import Layout from './components/Layout';
-   import SearchResults from './pages/SearchResults';
-      import Statistics from './pages/Statistics';
-         import Profile from './pages/Profile';
+import SearchResults from './pages/SearchResults';
+import Statistics from './pages/Statistics';
+import Profile from './pages/Profile';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) {
     return <Navigate to="/" replace />;
   }
+  return children;
+};
+
+// Only lets Admins through. Anyone else gets sent back to their dashboard-less home.
+const AdminRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  if (user.role !== 'admin') {
+    return <Navigate to="/members" replace />;
+  }
+
   return children;
 };
 
@@ -39,13 +54,20 @@ function App() {
         
         {/* Wrap all protected routes inside the Layout */}
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/dashboard"
+            element={
+              <AdminRoute>
+                <Dashboard />
+              </AdminRoute>
+            }
+          />
           <Route path="/members" element={<Members />} />
           <Route path="/requests" element={<Requests />} />
           <Route path="/resources" element={<Resources />} />
-             <Route path="/search" element={<SearchResults />} />
-                <Route path="/statistics" element={<Statistics />} />
-                <Route path="/profile" element={<Profile />} />
+          <Route path="/search" element={<SearchResults />} />
+          <Route path="/statistics" element={<Statistics />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
       </Routes>
     </Router>
