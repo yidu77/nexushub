@@ -3,6 +3,8 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Swal from 'sweetalert2';
 
+const CATEGORIES = ['Laptop', 'Desktop', 'Printer', 'Meeting Room', 'Vehicle', 'Projector', 'Furniture'];
+
 function Resources() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,32 +14,34 @@ function Resources() {
   const [filterStatus, setFilterStatus] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({ resource_code: '', name: '', category: '', status: 'Available' });
+  // resource_code removed — the backend generates it automatically now
+  const [formData, setFormData] = useState({ name: '', category: '', status: 'Available' });
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const canManage = user.role === 'admin' || user.role === 'manager';
+  // Matches the backend: only Admins can create/edit/delete resources.
+  // Managers can view, but not manage (per the role spec).
+  const canManage = user.role === 'admin';
   const token = localStorage.getItem('token');
   const config = { headers: { Authorization: `Bearer ${token}` } };
 
-  useEffect(() => { 
-    fetchResources(); 
+  useEffect(() => {
+    fetchResources();
   }, [search, filterCategory, filterStatus]);
 
   const fetchResources = async () => {
     try {
       const response = await axios.get(`https://nexushub-backend-985p.onrender.com/api/resources?search=${search}&category=${filterCategory}&status=${filterStatus}`, config);
       setResources(response.data);
-    } catch (error) { console.error('Error fetching resources:', error); } 
+    } catch (error) { console.error('Error fetching resources:', error); }
     finally { setLoading(false); }
   };
 
   const handleChange = (e) => { setFormData({ ...formData, [e.target.name]: e.target.value }); };
 
   const validateForm = () => {
-    if (!formData.resource_code.trim() || !formData.name.trim()) { toast.error('Please fill in all required fields'); return false; }
-    if (!editingId) {
-      const codeExists = resources.some(res => res.resource_code.toLowerCase() === formData.resource_code.toLowerCase());
-      if (codeExists) { toast.error('This Resource Code is already in use.'); return false; }
+    if (!formData.name.trim() || !formData.category.trim()) {
+      toast.error('Please fill in all required fields');
+      return false;
     }
     return true;
   };
@@ -54,7 +58,8 @@ function Resources() {
   };
 
   const handleEdit = (res) => {
-    setFormData({ resource_code: res.resource_code, name: res.name, category: res.category || '', status: res.status });
+    // resource_code intentionally left out — it's permanent, can't be edited
+    setFormData({ name: res.name, category: res.category || '', status: res.status });
     setEditingId(res.id); setShowForm(true);
   };
 
@@ -92,7 +97,7 @@ function Resources() {
   };
 
   const resetForm = () => {
-    setFormData({ resource_code: '', name: '', category: '', status: 'Available' });
+    setFormData({ name: '', category: '', status: 'Available' });
     setEditingId(null); setShowForm(false);
   };
 
@@ -111,10 +116,9 @@ function Resources() {
         <input type="text" placeholder="Search Code or Name..." value={search} onChange={(e) => setSearch(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700" />
         <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700">
           <option value="">All Categories</option>
-          <option value="IT">IT</option>
-          <option value="Electronics">Electronics</option>
-          <option value="Furniture">Furniture</option>
-          <option value="Vehicles">Vehicles</option>
+          {CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
         </select>
         <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="p-2 border rounded shadow-sm text-sm md:text-base dark:bg-gray-800 dark:text-white dark:border-gray-700">
           <option value="">All Statuses</option>
@@ -127,10 +131,19 @@ function Resources() {
       {showForm && canManage && (
         <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow mb-6">
           <h2 className="text-lg md:text-xl font-semibold mb-4 dark:text-white">{editingId ? 'Edit Resource' : 'Add New Resource'}</h2>
+          {!editingId && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              A resource code (e.g. LP-011) will be generated automatically based on the category you choose.
+            </p>
+          )}
           <form onSubmit={editingId ? handleUpdate : handleAddResource} className="grid grid-cols-1 gap-3">
-            <input type="text" name="resource_code" placeholder="Resource Code *" required value={formData.resource_code} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
             <input type="text" name="name" placeholder="Resource Name *" required value={formData.name} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
-            <input type="text" name="category" placeholder="Category" value={formData.category} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
+            <select name="category" required value={formData.category} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600">
+              <option value="">Select Category *</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
             <select name="status" value={formData.status} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600">
               <option value="Available">Available</option>
               <option value="In Use">In Use</option>
