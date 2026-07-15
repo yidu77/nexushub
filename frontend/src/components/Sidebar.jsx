@@ -5,6 +5,9 @@ function Sidebar() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
+  // Dashboard visible to Admin, Manager, Viewer — not Staff
+  const canSeeDashboard = ['admin', 'manager', 'viewer'].includes(user.role);
+
   const getLinkClass = (path) => {
     return location.pathname === path 
       ? 'bg-blue-700 dark:bg-gray-700 text-white' 
@@ -29,8 +32,7 @@ function Sidebar() {
       
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {/* Dashboard link only shown to admins */}
-        {user.role === 'admin' && (
+        {canSeeDashboard && (
           <Link to="/dashboard" className={`block p-2.5 rounded text-sm ${getLinkClass('/dashboard')}`}>
              📊 Dashboard
           </Link>
@@ -59,7 +61,6 @@ function Sidebar() {
             <p className="text-sm font-semibold text-white truncate">{displayName}</p>
             <p className="text-xs text-blue-200 dark:text-gray-400 truncate">{user.email}</p>
           </div>
-          {/* Small Arrow Icon to show it's clickable */}
           <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
           </svg>

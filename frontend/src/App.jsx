@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react'; // ← useEffect comes from 'react', NOT 'react-router-dom'!
+import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -19,15 +19,16 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Only lets Admins through. Anyone else gets sent back to their dashboard-less home.
-const AdminRoute = ({ children }) => {
+// Dashboard is visible to Admin, Manager, and Viewer — NOT Staff (matches the role spec).
+const DashboardRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   if (!token) {
     return <Navigate to="/" replace />;
   }
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  if (user.role !== 'admin') {
+  const allowedRoles = ['admin', 'manager', 'viewer'];
+  if (!allowedRoles.includes(user.role)) {
     return <Navigate to="/members" replace />;
   }
 
@@ -35,7 +36,6 @@ const AdminRoute = ({ children }) => {
 };
 
 function App() {
-  // Load theme from local storage on startup
   useEffect(() => {
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
@@ -47,19 +47,17 @@ function App() {
   return (
     <Router>
       <Toaster position="top-right" reverseOrder={false} />
-      
+
       <Routes>
-        {/* Login Page (Public) */}
         <Route path="/" element={<Login />} />
-        
-        {/* Wrap all protected routes inside the Layout */}
+
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route
             path="/dashboard"
             element={
-              <AdminRoute>
+              <DashboardRoute>
                 <Dashboard />
-              </AdminRoute>
+              </DashboardRoute>
             }
           />
           <Route path="/members" element={<Members />} />
