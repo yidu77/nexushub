@@ -8,6 +8,7 @@ import {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
 function Dashboard() {
+  const [stats, setStats] = useState(null);
   const [data, setData] = useState({ members: [], requests: [], resources: [] });
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -17,13 +18,17 @@ function Dashboard() {
       try {
         const token = localStorage.getItem('token');
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        
-        const [membersRes, requestsRes, resourcesRes] = await Promise.all([
+
+        // Summary numbers now come from the dedicated, role-scoped backend endpoint
+        // (Admin/Viewer = system-wide, Manager = their department only)
+        const [statsRes, membersRes, requestsRes, resourcesRes] = await Promise.all([
+          axios.get('https://nexushub-backend-985p.onrender.com/api/dashboard/stats', config),
           axios.get('https://nexushub-backend-985p.onrender.com/api/members', config),
           axios.get('https://nexushub-backend-985p.onrender.com/api/requests', config),
           axios.get('https://nexushub-backend-985p.onrender.com/api/resources', config)
         ]);
 
+        setStats(statsRes.data);
         setData({
           members: membersRes.data,
           requests: requestsRes.data,
@@ -40,24 +45,19 @@ function Dashboard() {
 
   if (loading) return <div className="p-6 text-center text-gray-500">Loading dashboard...</div>;
 
-  // --- Calculate Stats ---
-  const totalMembers = data.members.length;
-  const activeMembers = data.members.filter(m => m.status === 'Active').length;
-  const totalRequests = data.requests.length;
-  const completedRequests = data.requests.filter(r => r.status === 'Completed').length;
-  const pendingRequests = data.requests.filter(r => r.status === 'Pending').length;
-  const totalResources = data.resources.length;
-
-  // --- Get Recent Activities (Latest 5 of each) ---
+  // Recent activity lists still come from the regular endpoints above,
+  // which already apply their own role-based filtering (e.g. staff/manager scoping).
   const recentMembers = [...data.members].slice(0, 5);
   const recentRequests = [...data.requests].slice(0, 5);
   const recentResources = [...data.resources].slice(0, 5);
 
-  // --- Chart Data ---
+  const totalResources = data.resources.length;
+  const activeMembers = data.members.filter(m => m.status === 'Active').length;
+
   const requestsByStatus = [
-    { name: 'Pending', value: pendingRequests },
+    { name: 'Pending', value: data.requests.filter(r => r.status === 'Pending').length },
     { name: 'In Progress', value: data.requests.filter(r => r.status === 'In Progress').length },
-    { name: 'Completed', value: completedRequests }
+    { name: 'Completed', value: data.requests.filter(r => r.status === 'Completed').length }
   ];
 
   const membersByDept = data.members.reduce((acc, member) => {
@@ -69,15 +69,22 @@ function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6">
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-6">
-       Welcome back, {user.name}!
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-2">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">
+          Welcome back, {user.name}!
+        </h1>
+        {stats?.scope && (
+          <span className="inline-block w-fit px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+            {stats.scope}
+          </span>
+        )}
+      </div>
 
-      {/* Summary Cards - 6 Cards */}
+      {/* Summary Cards — now from the role-scoped /api/dashboard/stats endpoint */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500 dark:text-gray-400">Total Members</p>
-          <p className="text-2xl font-bold text-blue-600">{totalMembers}</p>
+          <p className="text-2xl font-bold text-blue-600">{stats?.totalMembers ?? 0}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500 dark:text-gray-400">Active Members</p>
@@ -85,15 +92,15 @@ function Dashboard() {
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500 dark:text-gray-400">Total Requests</p>
-          <p className="text-2xl font-bold text-purple-600">{totalRequests}</p>
+          <p className="text-2xl font-bold text-purple-600">{stats?.totalRequests ?? 0}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500 dark:text-gray-400">Pending Requests</p>
-          <p className="text-2xl font-bold text-yellow-600">{pendingRequests}</p>
+          <p className="text-2xl font-bold text-yellow-600">{stats?.pendingRequests ?? 0}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500 dark:text-gray-400">Completed Requests</p>
-          <p className="text-2xl font-bold text-green-600">{completedRequests}</p>
+          <p className="text-2xl font-bold text-green-600">{stats?.completedRequests ?? 0}</p>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500 dark:text-gray-400">Total Resources</p>
@@ -132,7 +139,6 @@ function Dashboard() {
       <div className="mb-8">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Recent Activities</h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* New Team Members */}
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
               👥 New Team Members
@@ -151,7 +157,6 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* New Work Requests */}
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
               📝 New Work Requests
@@ -170,7 +175,6 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Recently Added Resources */}
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3 flex items-center gap-2">
               📦 Recently Added Resources

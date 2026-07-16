@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
-const { verifyToken, isAdmin, isNotViewer } = require('../middleware/auth');
+const { verifyToken, isAdmin, isAdminOrManager } = require('../middleware/auth');
 const router = express.Router();
 
 router.use(verifyToken);
@@ -10,10 +10,9 @@ router.use(verifyToken);
 router.get('/', async (req, res) => {
   try {
     const { search, department, status } = req.query;
-    let query = `SELECT m.*, u.role FROM members m LEFT JOIN users u ON m.email = u.email WHERE 1=1`;
+    let query = `SELECT m.*, u.role FROM members m LEFT JOIN users u ON m.user_id = u.id WHERE 1=1`;
     const values = [];
 
-    // NEW: Managers can only see members in their own department
     if (req.userRole === 'manager') {
       values.push(req.userDepartment);
       query += ` AND m.department = $${values.length}`;
@@ -31,7 +30,7 @@ router.get('/', async (req, res) => {
       values.push(status);
       query += ` AND m.status = $${values.length}`;
     }
-    
+
     query += ' ORDER BY m.created_at DESC';
     const members = await pool.query(query, values);
     res.json(members.rows);
@@ -71,36 +70,42 @@ router.post('/', isAdmin, async (req, res) => {
   } finally { client.release(); }
 });
 
-// PUT (Update Member) - ADMIN ONLY
-router.put('/:id', isAdmin, async (req, res) => {
+// PUT (Update Member) - ADMIN or MANAGER
+// Admins can edit anyone, anything (except password — see note below).
+// Managers can only edit members in their OWN department, and cannot
+// change role or department (prevents a manager escalating someone to
+// admin, or moving them out of their team).
+// Passwords are never settable here by anyone — self-service only (see routes/auth.js).
+router.put('/:id', isAdminOrManager, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, department, status, role, password } = req.body; // Added password
+    const { name, email, phone, department, status, role } = req.body;
 
-    // 1. Get the user_id associated with this member
-    const memberCheck = await pool.query('SELECT user_id FROM members WHERE id = $1', [id]);
-    const userId = memberCheck.rows[0]?.user_id;
+    const memberCheck = await pool.query('SELECT user_id, department FROM members WHERE id = $1', [id]);
+    if (memberCheck.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
 
-    // 2. Update member profile
-    const updatedMember = await pool.query(
-      'UPDATE members SET name=$1, email=$2, phone=$3, department=$4, status=$5 WHERE id=$6 RETURNING *',
-      [name, email, phone, department, status, id]
-    );
+    const existingMember = memberCheck.rows[0];
+    const userId = existingMember.user_id;
 
-    // 3. Update user account
-    if (userId) {
-      // Update role and department
-      await pool.query('UPDATE users SET role=$1, department=$2 WHERE id=$3', [role, department, userId]);
-      
-      // NEW: Update password if the admin typed a new one
-      if (password && password.trim() !== '') {
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
-        await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [passwordHash, userId]);
-      }
+    // Managers can only touch members in their own department
+    if (req.userRole === 'manager' && existingMember.department !== req.userDepartment) {
+      return res.status(403).json({ error: 'You can only manage members in your own department.' });
     }
 
-    if (updatedMember.rows.length === 0) return res.status(404).json({ error: 'Member not found' });
+    // Managers can't reassign role or department — only admins can
+    const isManager = req.userRole === 'manager';
+    const finalDepartment = isManager ? existingMember.department : department;
+
+    const updatedMember = await pool.query(
+      'UPDATE members SET name=$1, email=$2, phone=$3, department=$4, status=$5 WHERE id=$6 RETURNING *',
+      [name, email, phone, finalDepartment, status, id]
+    );
+
+    if (userId && !isManager) {
+      // Only an admin's edit can change role/department on the linked user account
+      await pool.query('UPDATE users SET role=$1, department=$2 WHERE id=$3', [role, finalDepartment, userId]);
+    }
+
     res.json(updatedMember.rows[0]);
   } catch (error) {
     console.error(error);
@@ -112,27 +117,25 @@ router.put('/:id', isAdmin, async (req, res) => {
 router.delete('/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // STEP 1: Get the user_id from the member record
+
     const memberResult = await pool.query('SELECT user_id FROM members WHERE id = $1', [id]);
     if (memberResult.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
     }
-    
+
     const userId = memberResult.rows[0].user_id;
-    
-    // STEP 2: Delete from members table FIRST
+
     await pool.query('DELETE FROM members WHERE id = $1', [id]);
-    
-    // STEP 3: THEN delete from users table
+
     if (userId) {
       await pool.query('DELETE FROM users WHERE id = $1', [userId]);
     }
-    
+
     res.json({ message: 'Member deleted successfully!' });
   } catch (error) {
     console.error('DELETE ERROR:', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
-   module.exports = router;
+
+module.exports = router;

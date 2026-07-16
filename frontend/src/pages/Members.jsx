@@ -12,24 +12,33 @@ function Members() {
   const [filterDept, setFilterDept] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [editingId, setEditingId] = useState(null);
+  // password removed from form state entirely — creation still needs a temp password,
+  // handled separately below since only Admin ever sees that field.
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', department: '', status: 'Active', password: '', role: 'staff'
+    name: '', email: '', phone: '', department: '', status: 'Active', role: 'staff'
   });
+  const [tempPassword, setTempPassword] = useState('');
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const canManage = user.role === 'admin' || user.role === 'manager'; 
+  const isAdmin = user.role === 'admin';
+  const isManager = user.role === 'manager';
+  const canCreate = isAdmin;                 // Only Admin adds new members
+  const canEdit = isAdmin || isManager;       // Admin or Manager can edit
+  const canDelete = isAdmin;                  // Only Admin deletes
+  const canOpenForm = canCreate || canEdit;
+
   const token = localStorage.getItem('token');
   const config = { headers: { Authorization: `Bearer ${token}` } };
 
-  useEffect(() => { 
-    fetchMembers(); 
+  useEffect(() => {
+    fetchMembers();
   }, [search, filterDept, filterStatus]);
 
   const fetchMembers = async () => {
     try {
       const response = await axios.get(`https://nexushub-backend-985p.onrender.com/api/members?search=${search}&department=${filterDept}&status=${filterStatus}`, config);
       setMembers(response.data);
-    } catch (error) { console.error('Error fetching members:', error); } 
+    } catch (error) { console.error('Error fetching members:', error); }
     finally { setLoading(false); }
   };
 
@@ -37,9 +46,8 @@ function Members() {
 
   const validateForm = () => {
     if (!formData.name.trim() || !formData.email.trim()) { toast.error('Please fill in all required fields'); return false; }
-    if (!editingId && !formData.password) { toast.error('Please enter a temporary password'); return false; }
-    if (!editingId && formData.password.length < 6) { toast.error('Password must be at least 6 characters'); return false; }
-    if (formData.password && formData.password.length < 6) { toast.error('Password must be at least 6 characters'); return false; }
+    if (!editingId && !tempPassword) { toast.error('Please enter a temporary password'); return false; }
+    if (!editingId && tempPassword.length < 6) { toast.error('Password must be at least 6 characters'); return false; }
     return true;
   };
 
@@ -48,14 +56,21 @@ function Members() {
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await axios.post('https://nexushub-backend-985p.onrender.com/api/members', formData, config);
+      await axios.post('https://nexushub-backend-985p.onrender.com/api/members', { ...formData, password: tempPassword }, config);
       resetForm(); fetchMembers(); toast.success('Member added successfully!');
     } catch (error) { toast.error(error.response?.data?.error || 'Failed to add member'); }
     finally { setSubmitting(false); }
   };
 
   const handleEdit = (member) => {
-    setFormData({ name: member.name, email: member.email, phone: member.phone || '', department: member.department || '', status: member.status, password: '', role: member.role || 'staff' });
+    setFormData({
+      name: member.name,
+      email: member.email,
+      phone: member.phone || '',
+      department: member.department || '',
+      status: member.status,
+      role: member.role || 'staff'
+    });
     setEditingId(member.id); setShowForm(true);
   };
 
@@ -93,7 +108,8 @@ function Members() {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', email: '', phone: '', department: '', status: 'Active', password: '', role: 'staff' });
+    setFormData({ name: '', email: '', phone: '', department: '', status: 'Active', role: 'staff' });
+    setTempPassword('');
     setEditingId(null); setShowForm(false);
   };
 
@@ -101,7 +117,7 @@ function Members() {
     <div className="max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Team Members</h1>
-        {canManage && (
+        {canCreate && (
           <button onClick={() => { resetForm(); setShowForm(true); }} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full sm:w-auto text-sm md:text-base">
             {editingId ? 'Cancel Edit' : '+ Add Member'}
           </button>
@@ -124,22 +140,45 @@ function Members() {
         </select>
       </div>
 
-      {showForm && canManage && (
+      {showForm && canOpenForm && (
         <div className="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow mb-6">
           <h2 className="text-lg md:text-xl font-semibold mb-4 dark:text-white">{editingId ? 'Edit Member' : 'Add New Member'}</h2>
+
+          {editingId && isManager && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              As a manager, you can update this member's name, email, phone, and status.
+              Role and department changes require an admin.
+            </p>
+          )}
+
           <form onSubmit={editingId ? handleUpdate : handleAddMember} className="grid grid-cols-1 gap-3">
             <input type="text" name="name" placeholder="Full Name *" required value={formData.name} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
             <input type="email" name="email" placeholder="Email Address *" required value={formData.email} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
-            {!editingId && <input type="password" name="password" placeholder="Temporary Password *" required value={formData.password} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />}
-            {editingId && <input type="password" name="password" placeholder="New Password (leave blank to keep current)" value={formData.password} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />}
+
+            {/* Temporary password — only shown when creating (Admin only ever sees this) */}
+            {!editingId && (
+              <input type="password" placeholder="Temporary Password *" required value={tempPassword} onChange={(e) => setTempPassword(e.target.value)} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
+            )}
+
             <input type="text" name="phone" placeholder="Phone Number" value={formData.phone} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
-            <input type="text" name="department" placeholder="Department" value={formData.department} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600" />
-            <select name="role" value={formData.role} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600">
+
+            {/* Department & Role — Managers can't change these on an existing member */}
+            <input
+              type="text" name="department" placeholder="Department" value={formData.department} onChange={handleChange}
+              disabled={editingId && isManager}
+              className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            <select
+              name="role" value={formData.role} onChange={handleChange}
+              disabled={editingId && isManager}
+              className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               <option value="staff">Staff Member</option>
               <option value="manager">Manager</option>
               <option value="viewer">Viewer</option>
               <option value="admin">Administrator</option>
             </select>
+
             <select name="status" value={formData.status} onChange={handleChange} className="p-2 border rounded text-sm md:text-base dark:bg-gray-700 dark:text-white dark:border-gray-600">
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
@@ -162,7 +201,7 @@ function Members() {
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Department</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                   <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  {canManage && <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
+                  {(canEdit || canDelete) && <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>}
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -181,11 +220,15 @@ function Members() {
                     <td className="px-3 md:px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${member.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{member.status}</span>
                     </td>
-                    {canManage && (
+                    {(canEdit || canDelete) && (
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-1 md:gap-2">
-                          <button onClick={() => handleEdit(member)} className="p-1 md:p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">✏️</button>
-                          <button onClick={() => handleDelete(member.id)} className="p-1 md:p-2 bg-red-100 text-red-600 rounded hover:bg-red-200">🗑️</button>
+                          {canEdit && (
+                            <button onClick={() => handleEdit(member)} className="p-1 md:p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">✏️</button>
+                          )}
+                          {canDelete && (
+                            <button onClick={() => handleDelete(member.id)} className="p-1 md:p-2 bg-red-100 text-red-600 rounded hover:bg-red-200">🗑️</button>
+                          )}
                         </div>
                       </td>
                     )}
